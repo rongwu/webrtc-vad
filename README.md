@@ -1,46 +1,12 @@
-# 面对面翻译小程序
+# webrtc-vad-js
 
+原 webrtc,vad C/C++，转成 JS，微信小程序使用 
 
-面对面翻译小程序是微信团队针对中英文面对面沟通的场景开发的流式语音翻译小程序，基于微信同声传译插件封装实现，提供了中英文语音识别，文本翻译等功能。
+原生运行同一段语音效果
+[https://github.com/rongwu/webrtc-vad/blob/main/image/VAD1.png] 
 
+小程序
+[https://github.com/rongwu/webrtc-vad/blob/main/image/VAD2.png]
 
-
-## 预览
-![面对面翻译小程序](image/qr.jpg)
-
-
-## 下载与使用
-
-1. 克隆代码
-2. `project.config.json` 中的 `appid` 替换成在公众平台申请的项目 id
-3. 在 `公众平台 → 设置 → 第三方服务 → 插件管理` 中 添加微信同声传译插件 (`wx069ba97219f66d99`)
-4. 打开微信开发者工具中添加项目
-
-
-## 微信版本要求
-
-基础库版本 >= `1.9.94`
-
-- 使用插件，需要基础库版本 >= `1.9.6`
-- 插件内调用`wx.getRecorderManager`接口，需要基础库版本 >= `1.9.94`
-
-
-## 微信同声传译插件支持功能
-
-- 语音识别 (目前支持 `zh_CN（中国大陆）`,  `en_US（英语）`, `zh_HK（粤语）`, `sichuanhua`（四川话）)
-- 文本翻译 (目前支持 `zh_CN（中国大陆）`,  `en_US（英语）`)
-- 语音合成 (目前支持 `zh_CN（中国大陆）`,  `en_US（英语）`)
-
-## FAQ
-
-### 什么时候开放英语语音合成？
-
-~~插件语音合成支持`en_US（英语）`正在加紧开发中~~
-
-插件语音合成目前已经支持`en_US（英语）`
-
-对于插件有新需求，可描述具体使用场景发送邮件至`lethexie@tencent.com`
-
-## License
-
-[The MIT License](./LICENSE.txt)
+# 手机运行查看结果
+模拟器会有报错且，结果不对
