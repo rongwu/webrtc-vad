@@ -1,0 +1,11 @@
+.btn{
+  background-color: green;
+  color: #ffffff;
+  position: fixed;
+  bottom: 30rpx;
+  left: 300rpx;
+  width: 150rpx;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+}

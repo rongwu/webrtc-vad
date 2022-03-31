@@ -1,0 +1,8 @@
+
+
+<view class="btn" catchtouchstart="onTouchStart" catchtouchend="onTouchEnd" catchtouchcancel="onTouchEnd">
+长按录音
+</view>
+
+
+
