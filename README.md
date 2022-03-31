@@ -6,7 +6,7 @@
 ![](https://test2.jyex.cn/dwjxapi/H5/StrokeOrderWX/exchange/VAD1.png) 
 
 小程序
-![](https://test2.jyex.cn/dwjxapi/H5/StrokeOrderWX/exchange/VAD1.png) 
+![](https://test2.jyex.cn/dwjxapi/H5/StrokeOrderWX/exchange/VAD2.png) 
 
 # 手机运行查看结果
 模拟器会有报错且，结果不对
