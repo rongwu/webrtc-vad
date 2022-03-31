@@ -9,4 +9,4 @@
 ![](https://test2.jyex.cn/dwjxapi/H5/StrokeOrderWX/exchange/VAD2.png) 
 
 # 手机运行查看结果
-模拟器会有报错且，结果不对
+录音测试时模拟器会报错且结果不如意，尽量用手机测试
