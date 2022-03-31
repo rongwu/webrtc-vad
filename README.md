@@ -6,7 +6,7 @@
 ![](image/VAD1.png) 
 
 小程序
-![](image/VAD2.png) 
+![](image/VAD1.png) 
 
 # 手机运行查看结果
 模拟器会有报错且，结果不对
