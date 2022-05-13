@@ -57,7 +57,8 @@ const kMaximumSpeech = [11392, 11392, 11520, 11520, 11520, 11520];
 const kMinimumMean = [640, 768];
 // Upper limit of mean value for noise model, Q7
 const kMaximumNoise = [9216, 9088, 8960, 8832, 8704, 8576];
-// Start values for the Gaussian models, Q7
+// Start values for the Gaussian models, Q7(Weights: 权重, Means: 均值, Stds: 方差)
+// Q7量化为2^7 =128 显然， kNoiseDataWeights[0]=34/128 + kNoiseDataWeights[6]=94/128 = 1; 62/128+66/128 = 1;...依次类推
 // Weights for the two Gaussians for the six channels (noise)
 const kNoiseDataWeights = [34, 62, 72, 66, 53, 25, 94, 66, 56, 62, 75, 103];
 // Weights for the two Gaussians for the six channels (speech)
@@ -190,7 +191,7 @@ function GmmProbability(self, features, total_power, frame_length) {
         // 1) Calculating the likelihood of speech and thereby a VAD decision.
         // 2) Updating the underlying model, w.r.t., the decision made.
 
-        // The detection scheme is an LRT with hypothesis
+        // The detection scheme is an LRT with hypothesis(基于假设的似然检验)
         // H0: Noise
         // H1: Speech
         //
@@ -223,7 +224,20 @@ function GmmProbability(self, features, total_power, frame_length) {
                 speech_probability[k] = kSpeechDataWeights[gaussian] * tmp1_s32[0];
                 h1_test[0] += speech_probability[k];  // Q27
             }
-
+            // Pr(A)是A的先验概率或边缘概率。之所以称为"先验"是因为它不考虑任何B方面的因素。
+            // Pr(A|B)是已知B发生后A的条件概率，也由于得自B的取值而被称作A的后验概率。
+            // 直接用似然概率表达并不准确，因为X在H0发生的可能性大，可能是因为H0发生的可能性大，
+            // 即先验概率Pr{H0} Pr{H1}无法比较。
+            // 对于统计分类判决，该特征样本发生后属于哪个类别是其后验概率，即Pr{H0|X} Pr{H1|X}， 
+            // 也即最大后验概率准则的判决。通过贝叶斯定理：
+            // P(x|H) = P(H|x)P(x)/P(H)
+            // 由此可见，代码直接使用似然概率是假设了噪声和语音的先验概率一样，即在一段音频数据大概
+            // 一半是噪声一半有语音。
+            // 由于概率密度函数大多具有指数函数的形式，采用似然函数的对数通常更为简便。
+            // 对数函数不改变原函数的单调性和极值位置，而且根据对数函数的性质可以将乘积转换为加减式
+            // 令似然函数的偏导数为零即可求得极值条件
+            //
+            // 计算似然(likelihood)比例
             // Calculate the log likelihood ratio: log2(Pr{X|H1} / Pr{X|H1}).
             // Approximation:
             // log2(Pr{X|H1} / Pr{X|H1}) = log2(Pr{X|H1}*2^Q) - log2(Pr{X|H1}*2^Q)
@@ -287,8 +301,73 @@ function GmmProbability(self, features, total_power, frame_length) {
         vadflag[0] |= (sum_log_likelihood_ratios[0] >= totalTest[0]);
 
         // Update the model parameters.
+        /*
+        极大似然估计更新参数
+        极大似然原理的直观想法是，一个随机试验如有若干个可能的结果A，B，C，... ，若在一次试验中，结果A出现了，那么可以认为实验条件对A的出现有利，也即出现的概率P(A)较大。
+        设甲箱中有99个白球，1个黑球；乙箱中有1个白球．99个黑球。现随机取出一箱，再从抽取的一箱中随机取出一球，结果是黑球，这一黑球从乙箱抽取的概率比从甲箱抽取的概率大得多，这时我们自然更多地相信这个黑球是取自乙箱的。
+        一般说来，事件A发生的概率与某一未知参数θ有关，θ取值不同，则事件A发生的概率P(A|θ)也不同，当我们在一次试验中事件A发生了，则认为此时的θ值应是t的一切可能取值中使P(A|θ)达到最大的那一个，极大似然估计法就是要选取这样的t值作为参数t的估计值，使所选取的样本在被选的总体中出现的可能性为最大。
+        上面例子
+        事件A（取出黑球）发生的概率（P(A|θ)）与某一未知参数θ（箱子）有关，则认为此时的θ值应是t的一切可能取值中使P(A|θ)达到最大的那一个。
+        P(A|θ) = P(取出黑球|箱子)，t取值：甲箱，乙箱，P(A|θ)最大，θ=t=乙箱
+        极大似然估计，只是一种概率论在统计学的应用，它是参数估计的方法之一。说的是已知某个随机样本满足某种概率分布，但是其中具体的参数不清楚，参数估计就是通过若干次试验，观察其结果，利用结果推出参数的大概值。极大似然估计是建立在这样的思想上：已知某个参数能使这个样本出现的概率最大，我们当然不会再去选择其他小概率的样本，所以干脆就把这个参数作为估计的真实值。
+        极大似然估计，通俗理解来说，就是利用已知的样本结果信息，反推最具有可能（最大概率）导致这些样本结果出现的模型参数值！
+        当模型满足某个分布，它的参数值我通过极大似然估计法求出来的话。比如正态分布中公式如下
+        1/(Math.sqrt(2*π)*s)*exp(-(x - m)^2 / (2 * s^2))
+        如果我通过极大似然估计，得到模型中参数[m]和[s]的值，那么这个模型的均值和方差以及其它所有的信息我们是不是就知道了呢.
+        求解步骤
+        （1） 写出似然函数
+        （2） 对似然函数取对数，并整理
+        （3） 求导数
+        （4） 解似然方程
+
+        统计学中，似然函数是一种关于统计模型参数的函数。给定输出x时，关于参数θ的似然函数L(θ|x)（在数值上）等于给定参数θ后变量X的概率：L(θ|x)=P(X=x|θ)。
+        高斯混合模型的概率分布为：
+                 k
+        P(x|θ) = ∑ ak*Ø(x|θk)  ak: 是观测数据属于第 k 个子模型的概率, k 是混合模型中子高斯模型的数量
+                k=1
+        似然函数由概率密度函数给出。
+        L(θ|x) = II P(x|θ)
+        由于每个点发生的概率都很小，乘积会变得极其小，不利于计算和观察，因此通常我们用 Maximum Log-Likelihood 来计算（因为 Log 函数具备单调性，不会改变极值的位置，同时在 0-1 之间输入值很小的变化可以引起输出值相对较大的变动）
+        L(θ) = log(L(θ|x)) = ∑ log(P(x|θ)) 
+        由于该模型为高斯混合模型，其极大似然函数可设计为：
+        L(θ) = p(G1)∗logG1(x;θ1)+p(G2​)∗logG2​(x;θ2​)  p(Gk​)为对应高斯分布的权重 
+        这里 log表示取对数，显然高斯分布是自然指数，所以为 e为底的ln。
+
+        由于每次更新只有一个样本特征，得到当前的似然极大估计并不准确（过拟合），希望在每次更新步进朝极大值更新，这里使用梯度下降法来迭代实现最优化:
+        θ1 = θ - c*∇(L(θ))
+        由于梯度下降法是对具有极小值的代价函数（误差函数）的优化，我们这是有极大值的分布函数，故这里是梯度提升：
+        θ1 = θ + c*∇(L(θ))
+        上式 ∇(L(θ))是 L 在θ梯度，c为步进因子，该值较小时更新到最优的速度较慢，该值较大时可能不能得到极值，而是在极值附近振荡。
+        高斯模型均值参数 u0​的更新
+        L(u1)=p(G1)∗logG1(x;u1)+p(G2​)∗logG2​(x;θ2​)
+        上式对 u1​ 求导， p(G2​)∗logG2​(x;θ2​) 该项与 u1​无关，导数为0，故忽略。则
+
+        L(u1) = p(G1)∗log(1/(Math.sqrt(2*π)*s)*exp(-(x - u1)^2 / (2 * s^2)))
+              = p(G1)∗log(1/(Math.sqrt(2*π)*s)+ p(G1)∗log(exp(-(x - u1)^2 / (2 * s^2))))
+              = p(G1)∗log(1/(Math.sqrt(2*π)*s) + p(G1)∗(-(x - u1)^2 / (2 * s^2))
+        上式继续忽略与 u1​无关项，则 
+        ∇(L(u1)) = ∇( p(G1)∗(-(x - u1)^2 / (2 * s^2)) )
+                 = p(G1)∗((x - u1) / s^2)
+        则 u1​的更新：
+         u1 = u1 + p(G1)∗((x - u1) / s^2)*c
+
+         高斯模型方差参数 s1​的更新
+         L(s1) = p(G1)∗logG1(x;s1)+p(G2​)∗logG2​(x;θ2​)  p(Gk​)为对应高斯分布的权重
+         上式对 s1​ 求导， p(G2​)∗logG2​(x;θ2​) 该项与 s1​无关，导数为0，故忽略。则
+         L(s1) = p(G1)∗logG1(x;s1)
+              = p(G1)∗log(1/(Math.sqrt(2*π)*s1)*exp(-(x - u1)^2 / (2 * s1^2)))
+              = p(G1)∗log(1/(Math.sqrt(2*π)*s1) + p(G1)∗(-(x - u1)^2 / (2 * s1^2))
+              = p(G1)∗log(1/(Math.sqrt(2*π)) + p(G1)∗log(1/s1) + p(G1)∗(-(x - u1)^2 / (2 * s1^2))
+        上式继续忽略与 s1​无关项，则
+        ∇(L(s1))= p(G1)*∇(log(1/s1)+(-(x - u1)^2 / (2 * s1^2)))
+                = p(G1)*(-1/s+(x - u1)^2 / (s1^3))
+                = p(G1)*1/s((x - u1)^2/s1^2 - 1)
+        则 s1​的更新：
+         s1 = s1 + p(G1)∗*1/s((x - u1)^2/s1^2 - 1)*c
+         */
+        
         maxspe[0] = 12800;
-        for (channel = 0; channel < kNumChannels; channel++) {
+        for (channel = 0; channel < kNumChannels; channel++) { 
 
             // Get minimum value in past which is used for long term correction in Q4.
             feature_minimum[0] = WebRtcVad_FindMinimum(self, features[channel], channel);
