@@ -71,7 +71,33 @@ function allPassFilter(data_in, dIndex, data_length, filter_coefficient, filter_
     // has the the same sign as the impulse responses first taps.
     // First 6 taps of the impulse response:
     // 0.6399 0.5905 -0.3779 0.2418 -0.1547 0.0990
-
+    /*
+    数字滤波器的差分方程表示为：
+    令x(n)为输入序列， y(n)为输出序列， c为实系数filter_coefficient ，可知表示 :
+    y(n)=x(n−1)−c∗y(n−1)+c∗x(n)
+    但由于函数中data_in +=2, 即反馈是只与历史第二值相关的，其表示为：
+    y(n)=x(n−2)−c∗y(n−2)+c∗x(n)
+    则传输函数为：
+    H(z) = (c+z^−2)/(1+c*z^−2)​
+    是一个2阶全通滤波器，∣H(w)∣=1。
+    滤波器当前的输出仅依赖于输入，而不依赖过去的输出，称为非递归滤波器(FIR)
+    反之，滤波器当前的输出依赖于输入和过去的输出，称为递归滤波器（IIR)，N为递归滤波器的阶数。
+    一对互补的低通和高通传输函数可有两个稳定的全通滤波器并联组成
+    F(z)=1/2​(A0​(z)+A1​(z))
+    G(z)=1/2(A0​(z)−A1​(z))
+    第一个全通滤波器的参数kAllPassCoefsQ15[0] = 20972, 即 c = 20972/(2^15) = 0.64，则传输函数：
+    A0​(z) = (0.64+z^−2)/(1+0.64*z^−2)​
+    第二个全通滤波器的参数kAllPassCoefsQ15[0] = 5571, 即 c = 5571/(2^15) = 0.17， 则传输函数：
+    A1(z) = (0.17+z^−2)/(1+0.17*z^−2)​
+    第一个全通滤波器的输入序列data_in[n]是第二个全通函数输入序列data_in[n+1]的移位，且全通滤波器中输出是 tmp16 = (int16_t) (tmp32 >> 16); // Q(-1) *data_out++ = tmp16;Q(-1), 即 1/2的输出，则传输函数为
+    H(z) = 1/2(A1(z) + z^-1*A0(z)) 和 H(z) = 1/2(A1(z) - z^-1*A0(z))
+    函数中*hp_data_out++ -= *lp_data_out;对应的高通传输函数：
+    H(z) = 1/2(A1(z) + z^-1*A0(z))
+         = 1/2((0.17+z^−2)/(1+0.17*z^−2)​ + z^-1*(0.64+z^−2)/(1+0.64*z^−2)​)
+    函数中*lp_data_out++ += tmp_out;对应的低通传输函数：
+    H(z) = 1/2(A1(z) - z^-1*A0(z))
+         = 1/2((0.17+z^−2)/(1+0.17*z^−2)​ - z^-1*(0.64+z^−2)/(1+0.64*z^−2)​)
+    */
     var i;
     var tmp16 = new Int16Array(new ArrayBuffer(2));
     tmp16[0] = 0;
